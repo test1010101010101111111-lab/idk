@@ -307,9 +307,9 @@ farm:CreateToggle({
         while _G.sell == true do
             wait()
             pcall(function()
-                game.workspace.sellAreaCircles["sellAreaCircle"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
+                game.workspace.sellAreaCircles["sellAreaCircle16"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
                 wait()
-                game.workspace.sellAreaCircles["sellAreaCircle"].circleInner.CFrame = game.Workspace.Part.CFrame
+                game.workspace.sellAreaCircles["sellAreaCircle16"].circleInner.CFrame = game.Workspace.Part.CFrame
             end)
         end
     end
@@ -326,9 +326,9 @@ farm:CreateToggle({
             pcall(function()
                 -- FIX: Đổi 'player' thành 'LocalPlayer'
                 if LocalPlayer.PlayerGui.gameGui.maxNinjitsuMenu.Visible == true then
-                    game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
+                    game.workspace.sellAreaCircles["sellAreaCircle16"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
                     wait()
-                    game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = game.Workspace.Part.CFrame
+                    game.workspace.sellAreaCircles["sellAreaCircle16"].circleInner.CFrame = game.Workspace.Part.CFrame
                 end
             end)
         end
@@ -637,3 +637,4 @@ misc:CreateButton({
 
 
 Rayfield:LoadConfiguration()
+
