@@ -1,0 +1,638 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Ninja Legends",
+    LoadingTitle = "Ninja Legends Hub",
+    LoadingSubtitle = "by M4k3By41W1thPr0mpt",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "NinjaLegends"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local main = Window:CreateTab("Main", 6026568198)
+local farm = Window:CreateTab("Auto Farm", 7044284832)
+local tp = Window:CreateTab("Teleport", 6035190846)
+local egg = Window:CreateTab("Crystal", 6031265976)
+local misc = Window:CreateTab("Misc", 6034509993)
+
+local TimeLabel = main:CreateLabel("[GameTime] : Loading...")
+
+spawn(function()
+    while task.wait() do
+        pcall(function()
+            local GameTime = math.floor(workspace.DistributedGameTime+0.5)
+            local Hour = math.floor(GameTime/(60^2))%24
+            local Minute = math.floor(GameTime/(60^1))%60
+            local Second = math.floor(GameTime/(60^0))%60
+            TimeLabel:Set("[GameTime] : Hours : "..Hour.." Minutes : "..Minute.." Seconds : "..Second)
+        end)
+    end
+end)
+
+local FpsLabel = main:CreateLabel("[Fps] : Loading...")
+
+spawn(function()
+    while true do
+        wait(.1)
+        pcall(function()
+            local Fps = math.floor(workspace:GetRealPhysicsFPS())
+            FpsLabel:Set("[Fps] : "..Fps)
+        end)
+    end
+end)
+
+local PingLabel = main:CreateLabel("[Ping] : Loading...")
+
+spawn(function()
+    while true do
+        wait(.1)
+        pcall(function()
+            local Ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+            PingLabel:Set("[Ping] : "..Ping)
+        end)
+    end
+end)
+
+main:CreateSection("Main")
+
+main:CreateButton({
+    Name = "Disable Trading",
+    Callback = function()
+        local args = {
+            [1] = "disableTrading"
+        }
+        game:GetService("ReplicatedStorage").rEvents.tradingEvent:FireServer(unpack(args))
+    end
+})
+
+main:CreateButton({
+    Name = "Enable Trading",
+    Callback = function()
+        local args = {
+            [1] = "enableTrading"
+        }
+        game:GetService("ReplicatedStorage").rEvents.tradingEvent:FireServer(unpack(args))
+    end
+})
+
+-- FIX: Hàm lấy danh sách player (dùng Name thay vì DisplayName)
+local function GetPlayerList()
+    local list = {}
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then
+            table.insert(list, v.Name)
+        end
+    end
+    return list
+end
+
+-- FIX: Tạo mapping DisplayName -> Name để hiển thị đẹp hơn
+local function GetPlayerListWithDisplay()
+    local list = {}
+    local mapping = {}
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then
+            local displayText = v.DisplayName .. " (@" .. v.Name .. ")"
+            table.insert(list, displayText)
+            mapping[displayText] = v.Name
+        end
+    end
+    return list, mapping
+end
+
+local PlayerList, PlayerMapping = GetPlayerListWithDisplay()
+local TpPlayer = nil
+
+local PlayerDropdown = main:CreateDropdown({
+    Name = "Select Player",
+    Options = PlayerList,
+    CurrentOption = {},
+    MultipleOptions = false,
+    Callback = function(Option)
+        -- FIX: Lấy tên thật từ mapping
+        TpPlayer = PlayerMapping[Option]
+    end
+})
+
+-- FIX: Cập nhật danh sách khi player vào/rời
+Players.PlayerAdded:Connect(function(plr)
+    task.wait(0.5)
+    PlayerList, PlayerMapping = GetPlayerListWithDisplay()
+    pcall(function()
+        PlayerDropdown:Refresh(PlayerList)
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    task.wait(0.5)
+    PlayerList, PlayerMapping = GetPlayerListWithDisplay()
+    -- Reset nếu player đã chọn rời game
+    if TpPlayer == plr.Name then
+        TpPlayer = nil
+    end
+    pcall(function()
+        PlayerDropdown:Refresh(PlayerList)
+    end)
+end)
+
+main:CreateButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        PlayerList, PlayerMapping = GetPlayerListWithDisplay()
+        pcall(function()
+            PlayerDropdown:Refresh(PlayerList)
+        end)
+        Rayfield:Notify({
+            Title = "Success",
+            Content = "Player list refreshed!",
+            Duration = 2
+        })
+    end
+})
+
+main:CreateButton({
+    Name = "Teleport To Player",
+    Callback = function()
+        -- FIX: Thêm check nil và error handling
+        if not TpPlayer then
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Please select a player first!",
+                Duration = 3
+            })
+            return
+        end
+        
+        local targetPlayer = Players:FindFirstChild(TpPlayer)
+        if not targetPlayer then
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Player not found! They may have left.",
+                Duration = 3
+            })
+            return
+        end
+        
+        if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Target player's character not found!",
+                Duration = 3
+            })
+            return
+        end
+        
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Your character not found!",
+                Duration = 3
+            })
+            return
+        end
+        
+        -- FIX: Dùng pcall để bắt lỗi
+        local success, err = pcall(function()
+            LocalPlayer.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 20, 1)
+        end)
+        
+        if success then
+            Rayfield:Notify({
+                Title = "Success",
+                Content = "Teleported to " .. targetPlayer.DisplayName,
+                Duration = 2
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Teleport failed: " .. tostring(err),
+                Duration = 3
+            })
+        end
+    end
+})
+
+main:CreateSlider({
+    Name = "Speed",
+    Range = {0, 1000},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 16,
+    Callback = function(v)
+        pcall(function()
+            LocalPlayer.Character.Humanoid.WalkSpeed = v
+        end)
+    end
+})
+
+main:CreateSlider({
+    Name = "Jump",
+    Range = {0, 1000},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 50,
+    Callback = function(v)
+        pcall(function()
+            LocalPlayer.Character.Humanoid.JumpPower = v
+        end)
+    end
+})
+
+main:CreateToggle({
+    Name = "Disable PopUp Coin & Chi",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.PopUp = state
+        pcall(function()
+            LocalPlayer.PlayerGui.statEffectsGui.Enabled = not LocalPlayer.PlayerGui.statEffectsGui.Enabled
+            LocalPlayer.PlayerGui.hoopGui.Enabled = not LocalPlayer.PlayerGui.hoopGui.Enabled
+        end)
+    end
+})
+
+main:CreateToggle({
+    Name = "Invisibility",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.invis = (state and true or false)
+        wait()
+        while _G.invis == true do
+            wait()
+            pcall(function()
+                local A_1 = "goInvisible"
+                local Event = LocalPlayer.ninjaEvent
+                Event:FireServer(A_1)
+            end)
+        end
+    end
+})
+
+farm:CreateSection("Auto Farm")
+
+farm:CreateToggle({
+    Name = "Auto Swing",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.swing = (state and true or false)
+        wait()
+        while _G.swing == true do
+            wait()
+            pcall(function()
+                local args = {
+                    [1] = "swingKatana"
+                }
+                LocalPlayer.ninjaEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Sell",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.sell = (state and true or false)
+        wait()
+        while _G.sell == true do
+            wait()
+            pcall(function()
+                game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
+                wait()
+                game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = game.Workspace.Part.CFrame
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Sell When Full",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.sellFull = (state and true or false)
+        wait()
+        while _G.sellFull == true do
+            wait()
+            pcall(function()
+                -- FIX: Đổi 'player' thành 'LocalPlayer'
+                if LocalPlayer.PlayerGui.gameGui.maxNinjitsuMenu.Visible == true then
+                    game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame
+                    wait()
+                    game.workspace.sellAreaCircles["sellAreaCircle15"].circleInner.CFrame = game.Workspace.Part.CFrame
+                end
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Buy Sword",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.sw = (state and true or false)
+        wait()
+        while _G.sw == true do
+            wait()
+            pcall(function()
+                local args = {
+                    [1] = "buyAllSwords",
+                    [2] = "Blazing Vortex Island"
+                }
+                LocalPlayer.ninjaEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Buy Belts",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.belt = (state and true or false)
+        wait()
+        while _G.belt == true do
+            wait()
+            pcall(function()
+                local args = {
+                    [1] = "buyAllBelts",
+                    [2] = "Blazing Vortex Island"
+                }
+                LocalPlayer.ninjaEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Buy Skills",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.sk = (state and true or false)
+        wait()
+        while _G.sk == true do
+            wait()
+            pcall(function()
+                local args = {
+                    [1] = "buyAllSkills",
+                    [2] = "Blazing Vortex Island"
+                }
+                LocalPlayer.ninjaEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Buy Ranks",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.r = (state and true or false)
+        wait()
+        while _G.r == true do
+            wait()
+            pcall(function()
+                local oh1 = "buyRank"
+                local oh2 = game:GetService("ReplicatedStorage").Ranks.Ground:GetChildren()
+                for i = 1,#oh2 do
+                    LocalPlayer.ninjaEvent:FireServer(oh1, oh2[i].Name)
+                end
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Buy Shurikens",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.sh = (state and true or false)
+        wait()
+        while _G.sh == true do
+            wait()
+            pcall(function()
+                local args = {
+                    [1] = "buyAllShurikens",
+                    [2] = "Blazing Vortex Island"
+                }
+                LocalPlayer.ninjaEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Farm Chi",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.c = (state and true or false)
+        wait()
+        while _G.c == true do
+            wait()
+            pcall(function()
+                for i,v in pairs(game.Workspace.spawnedCoins.Valley:GetChildren()) do
+                    if v.Name == "Blue Chi Crate" then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(v.Position)
+                        wait(.3)
+                    end
+                end
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Farm Coin",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.co = (state and true or false)
+        wait()
+        while _G.co == true do
+            wait()
+            pcall(function()
+                for i,v in pairs(game.Workspace.spawnedCoins.Valley:GetChildren()) do
+                    if v.Name == "Purple Coin Crate" then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(v.Position)
+                        wait(.3)
+                    end
+                end
+            end)
+        end
+    end
+})
+
+farm:CreateToggle({
+    Name = "Auto Hoops",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.hoops = (state and true or false)
+        wait()
+        while _G.hoops == true do
+            wait()
+            pcall(function()
+                for _,v in pairs(workspace.Hoops:GetDescendants()) do
+                    if v.ClassName == "MeshPart" then
+                        v.touchPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local ISLAND = {}
+for i,v in pairs(game.workspace.islandUnlockParts:GetChildren()) do
+    table.insert(ISLAND, v.Name)
+end
+
+tp:CreateSection("Island")
+
+tp:CreateDropdown({
+    Name = "Teleports",
+    Options = ISLAND,
+    CurrentOption = {},
+    MultipleOptions = false,
+    Callback = function(a)
+        pcall(function()
+            LocalPlayer.Character.HumanoidRootPart.CFrame = game.Workspace.islandUnlockParts[a].islandSignPart.CFrame
+        end)
+    end
+})
+
+tp:CreateButton({
+    Name = "Unlock All Island",
+    Callback = function()
+        for i,v in next, game.workspace.islandUnlockParts:GetChildren() do
+            if v then
+                pcall(function()
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = v.islandSignPart.CFrame
+                end)
+                wait(.2)
+            end
+        end
+    end
+})
+
+egg:CreateSection("Crystal")
+
+local Crystal = {}
+for i,v in pairs(game.workspace.mapCrystalsFolder:GetChildren()) do
+    table.insert(Crystal,v.Name)
+end
+
+egg:CreateDropdown({
+    Name = "Select Crystal",
+    Options = Crystal,
+    CurrentOption = {},
+    MultipleOptions = false,
+    Callback = function(value)
+        _G.cryEgg = value
+    end
+})
+
+egg:CreateToggle({
+    Name = "Open Crystal",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.cCry = (state and true or false)
+        wait()
+        while _G.cCry == true do
+            wait()
+            pcall(function()
+                local oh1 = "openCrystal"
+                local oh2 = _G.cryEgg
+                game:GetService("ReplicatedStorage").rEvents.openCrystalRemote:InvokeServer(oh1, oh2)
+            end)
+        end
+    end
+})
+
+egg:CreateToggle({
+    Name = "Auto Evolved Pet",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.ePet = (state and true or false)
+        wait()
+        while _G.ePet == true do
+            wait()
+            pcall(function()
+                for i,v in pairs(LocalPlayer.petsFolder:GetChildren()) do
+                    for i,x in pairs(v:GetChildren()) do
+                        local oh1 = "evolvePet"
+                        local oh2 = x.Name
+                        game:GetService("ReplicatedStorage").rEvents.petEvolveEvent:FireServer(oh1, oh2)
+                    end
+                end
+            end)
+        end
+    end
+})
+
+misc:CreateSection("Misc")
+
+misc:CreateToggle({
+    Name = "Inf Double Jump",
+    CurrentValue = false,
+    Callback = function(state)
+        _G.iJump = state
+        if _G.iJump then
+            pcall(function()
+                LocalPlayer.multiJumpCount.Value = "99999999999999999"
+            end)
+        end
+    end
+})
+
+misc:CreateButton({
+    Name = "Get All Elements",
+    Callback = function()
+        pcall(function()
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Frost")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Inferno")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Lightning")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Electral Chaos")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Masterful Wrath")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Shadow Charge")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Shadowfire")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Eternity Storm")
+            game.ReplicatedStorage.rEvents.elementMasteryEvent:FireServer("Blazing Entity")
+        end)
+    end
+})
+
+local InfiniteJumpEnabled = false
+misc:CreateToggle({
+    Name = "Inf Jump",
+    CurrentValue = false,
+    Callback = function(state)
+        InfiniteJumpEnabled = state
+    end
+})
+
+-- FIX: Di chuyển connection ra ngoài để không tạo nhiều connection
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if InfiniteJumpEnabled then
+        pcall(function()
+            LocalPlayer.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+        end)
+    end
+end)
+
+misc:CreateButton({
+    Name = "Rejoin",
+    Callback = function()
+        local ts = game:GetService("TeleportService")
+        ts:Teleport(game.PlaceId, LocalPlayer)
+    end
+})
+
+Rayfield:LoadConfiguration()
