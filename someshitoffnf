@@ -1,0 +1,12 @@
+if game.PlaceId == 7346416636 then
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/salmsalm123/supported/main/PopItTradingFree'))()
+elseif game.PlaceId == 7903991471 then
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/salmsalm123/supported/main/PetsTradingFree'))()
+elseif game.PlaceId == 6447798030 then
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/salmsalm123/supported/main/FunkyFridayFree'))()
+elseif game.PlaceId == 109983668079237 then
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/salmsalm123/supported/refs/heads/main/StealABrainrot'))()
+else
+    local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    Fluent:Notify({Title = "Uni Hub", Content = "Unsupported Game", Duration = 3})
+end
