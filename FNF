@@ -22,13 +22,117 @@ local Tabs = {
     Main = Window:AddTab({ Title = "Main", Icon = "play" }),
 }
 
-local Side = nil
-
 local Toggle = Tabs.Main:AddToggle("Toggle", {
     Title = "Auto Player",
     Description = "Automatically Hit Notes (toggle while in song)",
     Default = false
 })
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- State (NO _G)
+local State = {
+    enabled = false,
+    delay = 0,
+    side = nil,
+    keymap = {},
+    columns = {},
+    connection = nil
+}
+
+-- Detect side
+local function detectSide()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    for _, stage in ipairs(workspace.Map.Stages:GetChildren()) do
+        local teams = stage:FindFirstChild("Teams")
+        if teams then
+            for _, side in {"Left", "Right"} do
+                local pad = teams:FindFirstChild(side)
+                if pad and (root.Position - pad.Position).Magnitude <= 5 then
+                    State.side = side
+                    return
+                end
+            end
+        end
+    end
+end
+
+-- Cache lanes
+local function cacheColumns()
+    local field = player.PlayerGui.Window.Game.Fields[State.side]
+    if not field then return end
+
+    local inner = field.Inner
+    State.columns = {}
+
+    for i = 1, 9 do
+        local lane = inner:FindFirstChild("Lane" .. i)
+        if lane then
+            State.columns[i] = lane.Notes
+        end
+    end
+end
+
+-- Cache keybinds
+local function cacheKeybinds()
+    local inner = player.PlayerGui.Window.Game.Fields[State.side].Inner
+
+    for i = 1, 9 do
+        local label = inner["Lane"..i].Labels.Label.Text.text
+        State.keymap[i] = Enum.KeyCode[label]
+    end
+end
+
+-- Play notes
+local function autoplayStep()
+    local threshold = 0.4 + State.delay
+
+    for col, notes in pairs(State.columns) do
+        for _, note in ipairs(notes:GetChildren()) do
+            if note:IsA("GuiObject") and note.Position.Y.Scale > threshold then
+                VirtualInputManager:SendKeyEvent(true, State.keymap[col], false, game)
+
+                if #note:GetChildren() == 2 then
+                    task.spawn(function()
+                        while note.Parent and note.Position.Y.Scale > threshold and State.enabled do
+                            RunService.Heartbeat:Wait()
+                        end
+                        VirtualInputManager:SendKeyEvent(false, State.keymap[col], false, game)
+                    end)
+                else
+                    VirtualInputManager:SendKeyEvent(false, State.keymap[col], false, game)
+                end
+            end
+        end
+    end
+end
+
+-- Enable
+local function enable()
+    if State.enabled then return end
+    State.enabled = true
+
+    detectSide()
+    cacheColumns()
+    cacheKeybinds()
+
+    State.connection = RunService.Heartbeat:Connect(autoplayStep)
+end
+
+-- Disable
+local function disable()
+    State.enabled = false
+    if State.connection then
+        State.connection:Disconnect()
+        State.connection = nil
+    end
+end
 
 Toggle:OnChanged(function(Value)
     if Value then
@@ -97,28 +201,21 @@ local Slider = Tabs.Main:AddSlider("Slider", {
     Callback = function(Value)
         pcall(function()
             if _G.Mode == "Static" then
-                _G.Delay = Value
+                State.delay = Value = Value
                 local player = game.Players.LocalPlayer
                 if player.PlayerGui.GameGui.Windows.Configuration.Frame.Body.Content.Settings.Entries.ScrollingFrame.DownScroll.Toggle.Inner.BackgroundColor3 == Color3.new(85/255, 255/255, 85/255) then
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
                     print("downscroll")
                 else
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
                     print("upscroll")
                 end
-            else
-                task.spawn(function()
-                    while true do
-                        _G.Delay = math.floor(math.random() * Value * 1000) / 1000
-                        task.wait()
-                    end
-                end)
                 
                 local player = game:GetService("Players").LocalPlayer
                 if player.PlayerGui.GameGui.Windows.Settings.Frame.Body.Settings.Settings.ScrollingFrame.DownScroll.Toggle.Outer.Inner.ImageColor3 == {85, 255, 85} then
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
                 else
-                    _G.Delay = math.floor(math.random() * Value * 1000) / 1000
+                    State.delay = Value = math.floor(math.random() * Value * 1000) / 1000
                 end
             end
         end)
@@ -191,64 +288,3 @@ game:GetService('Players').LocalPlayer.Idled:connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
-
-function CheckSide()
-    pcall(function ()
-        local player = game.Players.LocalPlayer
-        local character = player.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-
-        local minDistTo11 = math.huge
-        local minDistTo21 = math.huge
-
-        for _, stage in pairs(workspace.Map.Stages:GetChildren()) do
-            if stage:FindFirstChild("Teams") then
-                local pads = stage.Teams
-                local part11 = pads:FindFirstChild("Left")
-                local part21 = pads:FindFirstChild("Right")
-                
-                if part11 and (rootPart.Position - part11.Position).magnitude <= 5 then
-                    local distTo11 = (rootPart.Position - part11.Position).magnitude
-                    if distTo11 < minDistTo11 then
-                        minDistTo11 = distTo11
-                    end
-                end
-
-                if part21 and (rootPart.Position - part21.Position).magnitude <= 5 then
-                    local distTo21 = (rootPart.Position - part21.Position).magnitude
-                    if distTo21 < minDistTo21 then
-                        minDistTo21 = distTo21
-                    end
-                end
-            end
-        end
-
-        if minDistTo11 < minDistTo21 then
-            Side = "Left"
-        elseif minDistTo21 < minDistTo11 then
-            Side = "Right"
-        else
-
-        end
-    end)
-end
-
-while true do
-    local player = game:GetService("Players").LocalPlayer
-    if player.PlayerGui.GameGui.Windows.SongSelector.Visible == true then
-        CheckSide()
-    end
-    pcall(function()
-        keymap = player.PlayerGui.Window.Game.Fields[Side].Inner
-        key1 = Enum.KeyCode[keymap["Lane1"].Labels.Label.Text.text]
-        key2 = Enum.KeyCode[keymap["Lane2"].Labels.Label.Text.text]
-        key3 = Enum.KeyCode[keymap["Lane3"].Labels.Label.Text.text]
-        key4 = Enum.KeyCode[keymap["Lane4"].Labels.Label.Text.text]
-        key5 = Enum.KeyCode[keymap["Lane5"].Labels.Label.Text.text]
-        key6 = Enum.KeyCode[keymap["Lane6"].Labels.Label.Text.text]
-        key7 = Enum.KeyCode[keymap["Lane7"].Labels.Label.Text.text]
-        key8 = Enum.KeyCode[keymap["Lane8"].Labels.Label.Text.text]
-        key9 = Enum.KeyCode[keymap["Lane9"].Labels.Label.Text.text]
-    end)
-    task.wait()
-end
