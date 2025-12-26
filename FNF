@@ -30,113 +30,11 @@ local Toggle = Tabs.Main:AddToggle("Toggle", {
     Default = false
 })
 
-Toggle:OnChanged(function()
-    if Toggle.Value then
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        local RunService = game:GetService("RunService")
-        local Players = game:GetService("Players")
-
-        _G.auto = true
-        _G.Delay = _G.Delay or 0
-
-        local keymap = {
-            key1,
-            key2,
-            key3,
-            key4,
-            key5,
-            key6,
-            key7,
-            key8,
-            key9,
-        }
-
-        local function setupColumns(side)
-            local columns = {}
-            pcall(function()
-                local ap = Players.LocalPlayer.PlayerGui.Window.Game.Fields[side].Inner
-                
-                for i = 1, 9 do
-                    pcall(function()
-                        local lane = ap["Lane"..i]
-                        if lane then
-                            columns[i] = lane.Notes
-                        end
-                    end)
-                end
-            end)
-            return columns
-        end
-
-        local function autoplay()
-            while _G.auto do
-                pcall(function()
-                    local columns = setupColumns(Side)
-                    local trackedChildren = {}
-                    local activationThreshold = 0.4 + 1e-9 + _G.Delay
-
-                    for columnNum, column in pairs(columns) do
-                        pcall(function()
-                            trackedChildren[columnNum] = {}
-                            for _, child in ipairs(column:GetChildren()) do
-                                pcall(function()
-                                    if child:IsA("GuiObject") and child.Position.Y.Scale > activationThreshold then
-                                        trackedChildren[columnNum][child] = true
-                                        VirtualInputManager:SendKeyEvent(true, keymap[columnNum], false, game)
-                                    end
-                                end)
-                            end
-                        end)
-                    end
-
-                    while _G.auto do
-                        pcall(function()
-                            for columnNum, column in pairs(columns) do
-                                pcall(function()
-                                    for _, child in ipairs(column:GetChildren()) do
-                                        pcall(function()
-                                            if child:IsA("GuiObject") and not trackedChildren[columnNum][child] and child.Position.Y.Scale > activationThreshold then
-                                                trackedChildren[columnNum][child] = true
-                                                VirtualInputManager:SendKeyEvent(true, keymap[columnNum], false, game)
-                                                
-                                                if #child:GetChildren() == 2 then
-                                                    coroutine.wrap(function()
-                                                        pcall(function()
-                                                            while child.Parent and child.Position.Y.Scale > activationThreshold and _G.auto do
-                                                                RunService.Heartbeat:Wait()
-                                                            end
-                                                            VirtualInputManager:SendKeyEvent(false, keymap[columnNum], false, game)
-                                                            trackedChildren[columnNum][child] = nil
-                                                        end)
-                                                    end)()
-                                                end
-                                            end
-                                        end)
-                                    end
-                                    
-                                    for child in pairs(trackedChildren[columnNum]) do
-                                        pcall(function()
-                                            if not child:IsDescendantOf(column) or 
-                                               (child:IsA("GuiObject") and child.Position.Y.Scale <= activationThreshold) then
-                                                if trackedChildren[columnNum][child] then
-                                                    VirtualInputManager:SendKeyEvent(false, keymap[columnNum], false, game)
-                                                end
-                                                trackedChildren[columnNum][child] = nil
-                                            end
-                                        end)
-                                    end
-                                end)
-                            end
-                            RunService.Heartbeat:Wait()
-                        end)
-                    end
-                end)
-            end
-        end
-
-        coroutine.wrap(autoplay)()
+Toggle:OnChanged(function(Value)
+    if Value then
+        enable()
     else
-        _G.auto = false
+        disable()
     end
 end)
 
