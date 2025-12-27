@@ -179,18 +179,6 @@ local Section = Tabs.Main:AddParagraph({
 
 Tabs.Main:AddSection("Adjustments")
 
-local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
-    Title = "Delay Mode",
-    Values = {"Static", "Random"},
-    Multi = false,
-    Default = 1,
-    Callback = function(Value)
-        _G.Mode = Value
-    end
-})
-
-_G.Mode = "Static"
-
 local Slider = Tabs.Main:AddSlider("Slider", {
     Title = "Note ms Delay",
     Description = "More = Later",
@@ -199,26 +187,20 @@ local Slider = Tabs.Main:AddSlider("Slider", {
     Max = 0.4,
     Rounding = 2,
     Callback = function(Value)
+        State.delay = Value
+
+        local downscroll = false
         pcall(function()
-            if _G.Mode == "Static" then
-                State.delay = Value = Value
-                local player = game.Players.LocalPlayer
-                if player.PlayerGui.GameGui.Windows.Configuration.Frame.Body.Content.Settings.Entries.ScrollingFrame.DownScroll.Toggle.Inner.BackgroundColor3 == Color3.new(85/255, 255/255, 85/255) then
-                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
-                    print("downscroll")
-                else
-                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
-                    print("upscroll")
-                end
-                
-                local player = game:GetService("Players").LocalPlayer
-                if player.PlayerGui.GameGui.Windows.Settings.Frame.Body.Settings.Settings.ScrollingFrame.DownScroll.Toggle.Outer.Inner.ImageColor3 == {85, 255, 85} then
-                    State.delay = Value = State.delay = Value - State.delay = Value - State.delay = Value
-                else
-                    State.delay = Value = math.floor(math.random() * Value * 1000) / 1000
-                end
-            end
+            downscroll =
+                player.PlayerGui.GameGui.Windows.Configuration
+                .Frame.Body.Content.Settings.Entries
+                .ScrollingFrame.DownScroll.Toggle.Inner.BackgroundColor3
+                == Color3.new(85/255, 255/255, 85/255)
         end)
+
+        if downscroll then
+            State.delay = -State.delay
+        end
     end
 })
 
