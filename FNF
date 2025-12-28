@@ -80,14 +80,25 @@ local function cacheColumns()
 end
 
 -- Cache keybinds
-local function cacheKeybinds()
+llocal function cacheKeybinds()
     local inner = player.PlayerGui.Window.Game.Fields[State.side].Inner
+    State.keymap = {}
 
     for i = 1, 9 do
-        local label = inner["Lane"..i].Labels.Label.Text.text
-        State.keymap[i] = Enum.KeyCode[label]
+        local lane = inner:FindFirstChild("Lane"..i)
+        if lane and lane:FindFirstChild("Labels") then
+            local labelObj = lane.Labels:FindFirstChild("Label")
+            if labelObj and labelObj:FindFirstChild("Text") then
+                local keyName = labelObj.Text
+                local key = Enum.KeyCode[keyName]
+                if key then
+                    State.keymap[i] = key
+                end
+            end
+        end
     end
 end
+
 
 -- Play notes
 local function autoplayStep()
@@ -113,17 +124,27 @@ local function autoplayStep()
     end
 end
 
--- Enable
 local function enable()
     if State.enabled then return end
-    State.enabled = true
 
     detectSide()
+
+    if not State.side then
+        Fluent:Notify({
+            Title = "Auto Player",
+            Content = "Stand on a stage pad before enabling.",
+            Duration = 3
+        })
+        return
+    end
+
     cacheColumns()
     cacheKeybinds()
 
+    State.enabled = true
     State.connection = RunService.Heartbeat:Connect(autoplayStep)
 end
+
 
 -- Disable
 local function disable()
