@@ -1,5 +1,5 @@
 -- Funky Friday
--- 1xyzz
+-- Vortex
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
@@ -8,7 +8,7 @@ local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.Place
 local player = game:GetService("Players").LocalPlayer
 
 local Window = Fluent:CreateWindow({
-    Title = "Uni Hub  |",
+    Title = "Vortex Elite  |",
     SubTitle = gamename,
     TabWidth = 130,
     Size = UDim2.fromOffset(490, 400),
