@@ -8,7 +8,7 @@ local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.Place
 local player = game:GetService("Players").LocalPlayer
 
 local Window = Fluent:CreateWindow({
-    Title = "Vortex |",
+    Title = "CAP",
     SubTitle = gamename,
     TabWidth = 130,
     Size = UDim2.fromOffset(490, 400),
@@ -30,7 +30,7 @@ local Toggle = Tabs.Main:AddToggle("Toggle", {
     Default = false
 })
 
--- Improved autoplay functions
+-- ===== Improved Autoplay =====
 local function getKeymap()
     if not Side then return {} end
     local fields = player.PlayerGui.Window.Game.Fields[Side].Inner
@@ -39,7 +39,7 @@ local function getKeymap()
         local lane = fields["Lane"..i]
         if lane and lane:FindFirstChild("Labels") and lane.Labels:FindFirstChild("Label") then
             local keyText = lane.Labels.Label.Text
-            map[i] = Enum.KeyCode[keyText] -- converts string like "A" to Enum.KeyCode.A
+            map[i] = Enum.KeyCode[keyText]
         end
     end
     return map
@@ -74,7 +74,6 @@ local function autoplay()
             for colNum, notes in pairs(columns) do
                 for _, note in ipairs(notes) do
                     if note:IsA("GuiObject") then
-                        -- Press key
                         if note.Position.Y.Scale > threshold and not pressedKeys[note] then
                             pressedKeys[note] = true
                             VirtualInputManager:SendKeyEvent(true, keymap[colNum], false, game)
@@ -89,7 +88,6 @@ local function autoplay()
                                     pressedKeys[note] = nil
                                 end)()
                             end
-                        -- Release key
                         elseif note.Position.Y.Scale <= threshold and pressedKeys[note] then
                             VirtualInputManager:SendKeyEvent(false, keymap[colNum], false, game)
                             pressedKeys[note] = nil
@@ -101,8 +99,8 @@ local function autoplay()
         RunService.Heartbeat:Wait()
     end
 end
+-- ===== End Autoplay =====
 
--- Toggle callback
 Toggle:OnChanged(function()
     if Toggle.Value then
         _G.auto = true
@@ -114,7 +112,6 @@ end)
 
 Toggle:SetValue(false)
 
--- Menu handling
 game.GuiService.MenuOpened:Connect(function()
     if Toggle.Value then
         _G.Toggled = true
@@ -129,57 +126,188 @@ game.GuiService.MenuClosed:Connect(function()
     end
 end)
 
--- Keybind
 local Keybind = Tabs.Main:AddKeybind("Keybind", {
     Title = "Auto Player Keybind",
     Mode = "Toggle",
     Default = "Insert",
-    Callback = function()
-        Toggle:SetValue(not Toggle.Value)
+
+    Callback = function(Value)
+        if Toggle.Value then
+            Toggle:SetValue(false)
+        else
+            Toggle:SetValue(true)
+        end
     end,
 })
 
--- Rest of your GUI code (sliders, dropdowns, timer, buttons, etc.) remains unchanged
--- ...
+local Section = Tabs.Main:AddParagraph({
+    Title = "Use DownScroll",
+})
 
--- Function to check which side player is on
+Tabs.Main:AddSection("Adjustments")
+
+local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
+    Title = "Delay Mode",
+    Values = {"Static", "Random"},
+    Multi = false,
+    Default = 1,
+    Callback = function(Value)
+        _G.Mode = Value
+    end
+})
+
+_G.Mode = "Static"
+
+local Slider = Tabs.Main:AddSlider("Slider", {
+    Title = "Note ms Delay",
+    Description = "More = Later",
+    Default = 0,
+    Min = -0.4,
+    Max = 0.4,
+    Rounding = 2,
+    Callback = function(Value)
+        pcall(function()
+            if _G.Mode == "Static" then
+                _G.Delay = Value
+                local player = game.Players.LocalPlayer
+                if player.PlayerGui.GameGui.Windows.Configuration.Frame.Body.Content.Settings.Entries.ScrollingFrame.DownScroll.Toggle.Inner.BackgroundColor3 == Color3.new(85/255, 255/255, 85/255) then
+                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                    print("downscroll")
+                else
+                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                    print("upscroll")
+                end
+            else
+                task.spawn(function()
+                    while true do
+                        _G.Delay = math.floor(math.random() * Value * 1000) / 1000
+                        task.wait()
+                    end
+                end)
+                
+                local player = game:GetService("Players").LocalPlayer
+                if player.PlayerGui.GameGui.Windows.Settings.Frame.Body.Settings.Settings.ScrollingFrame.DownScroll.Toggle.Outer.Inner.ImageColor3 == {85, 255, 85} then
+                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
+                else
+                    _G.Delay = math.floor(math.random() * Value * 1000) / 1000
+                end
+            end
+        end)
+    end
+})
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+Window:SelectTab(1)
+
+local Timer = Tabs.Updates:AddParagraph({
+    Title = "Time: 00:00:00",
+})
+
+local st = os.time()
+
+local function timer()
+    while true do
+        local et = os.difftime(os.time(), st)
+        local h = math.floor(et / 3600)
+        local m = math.floor((et % 3600) / 60)
+        local s = et % 60
+        local ft = string.format("Time: %02d:%02d:%02d", h, m, s)
+
+        Timer:SetTitle(ft)
+        task.wait(1)
+    end
+end
+
+coroutine.wrap(timer)()
+
+Tabs.Updates:AddButton({
+    Title = "Discord Server",
+    Description = "Copies Discord Invite Link",
+    Callback = function()
+        setclipboard("https://discord.gg/44PHnFKxq5")
+        Fluent:Notify({Title = "Uni Hub", Content = "Copied Successfuly", Duration = 2})
+    end
+})
+
+Tabs.Updates:AddButton({
+    Title = "Run Infinite Yield",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+    end
+})
+
+local backpack = player:WaitForChild("Backpack")
+if backpack:FindFirstChild("Ui") then
+    backpack:FindFirstChild("Ui"):Destroy()
+end
+
+local tool = Instance.new("Tool")
+tool.Name = "Ui"
+tool.RequiresHandle = false
+tool.TextureId = "rbxassetid://135519282079256"
+tool.Parent = backpack
+
+Open = true
+tool.Activated:Connect(function()
+    if Open then
+        Window:Minimize()
+    else
+        Window:Minimize()
+    end
+end)
+
+local VirtualUser = game:GetService('VirtualUser')
+game:GetService('Players').LocalPlayer.Idled:connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
 function CheckSide()
-    pcall(function()
+    pcall(function ()
+        local player = game.Players.LocalPlayer
         local character = player.Character
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
 
-        local minDistToLeft = math.huge
-        local minDistToRight = math.huge
+        local minDistTo11 = math.huge
+        local minDistTo21 = math.huge
 
         for _, stage in pairs(workspace.Map.Stages:GetChildren()) do
-            local teams = stage:FindFirstChild("Teams")
-            if teams then
-                local leftPad = teams:FindFirstChild("Left")
-                local rightPad = teams:FindFirstChild("Right")
-
-                if leftPad then
-                    local dist = (rootPart.Position - leftPad.Position).Magnitude
-                    if dist < minDistToLeft then minDistToLeft = dist end
+            if stage:FindFirstChild("Teams") then
+                local pads = stage.Teams
+                local part11 = pads:FindFirstChild("Left")
+                local part21 = pads:FindFirstChild("Right")
+                
+                if part11 and (rootPart.Position - part11.Position).magnitude <= 5 then
+                    local distTo11 = (rootPart.Position - part11.Position).magnitude
+                    if distTo11 < minDistTo11 then
+                        minDistTo11 = distTo11
+                    end
                 end
-                if rightPad then
-                    local dist = (rootPart.Position - rightPad.Position).Magnitude
-                    if dist < minDistToRight then minDistToRight = dist end
+
+                if part21 and (rootPart.Position - part21.Position).magnitude <= 5 then
+                    local distTo21 = (rootPart.Position - part21.Position).magnitude
+                    if distTo21 < minDistTo21 then
+                        minDistTo21 = distTo21
+                    end
                 end
             end
         end
 
-        if minDistToLeft < minDistToRight then
+        if minDistTo11 < minDistTo21 then
             Side = "Left"
-        else
+        elseif minDistTo21 < minDistTo11 then
             Side = "Right"
+        else
+
         end
     end)
 end
 
--- Optional: periodically update side
-task.spawn(function()
-    while true do
+while true do
+    local player = game:GetService("Players").LocalPlayer
+    if player.PlayerGui.GameGui.Windows.SongSelector.Visible == true then
         CheckSide()
-        task.wait(0.5)
     end
-end)
+    task.wait()
+end
