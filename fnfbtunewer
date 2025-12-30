@@ -68,48 +68,60 @@ Toggle:OnChanged(function()
             return columns
         end
 
+-- Keymap updater
+local function updateKeymap()
+    if not Side then return end
+    local fields = player.PlayerGui.Window.Game.Fields[Side].Inner
+    keymap = {}
+    for i = 1, 9 do
+        local lane = fields["Lane"..i]
+        if lane and lane.Labels and lane.Labels.Label then
+            keymap[i] = Enum.KeyCode[lane.Labels.Label.Text]
+        end
+    end
+end
+
+-- Autoplay function
 local function autoplay()
     local RunService = game:GetService("RunService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
-
     local pressedKeys = {}
 
     while _G.auto do
-        pcall(function()
+        if Side then
             local columns = setupColumns(Side)
-            local activationThreshold = 0.4 + (_G.Delay or 0)
+            local threshold = 0.4 + (_G.Delay or 0)
 
-            for columnNum, column in pairs(columns) do
-                for _, note in ipairs(column:GetChildren()) do
+            for colNum, col in pairs(columns) do
+                for _, note in ipairs(col:GetChildren()) do
                     if note:IsA("GuiObject") then
-                        local isActive = note.Position.Y.Scale > activationThreshold
-                        if isActive and not pressedKeys[note] then
-                            -- Press key
-                            VirtualInputManager:SendKeyEvent(true, keymap[columnNum], false, game)
+                        local active = note.Position.Y.Scale > threshold
+                        if active and not pressedKeys[note] then
+                            VirtualInputManager:SendKeyEvent(true, keymap[colNum], false, game)
                             pressedKeys[note] = true
 
-                            -- Handle long notes
+                            -- Long notes
                             if #note:GetChildren() == 2 then
                                 coroutine.wrap(function()
-                                    while note.Parent and note.Position.Y.Scale > activationThreshold and _G.auto do
+                                    while note.Parent and note.Position.Y.Scale > threshold and _G.auto do
                                         RunService.Heartbeat:Wait()
                                     end
-                                    VirtualInputManager:SendKeyEvent(false, keymap[columnNum], false, game)
+                                    VirtualInputManager:SendKeyEvent(false, keymap[colNum], false, game)
                                     pressedKeys[note] = nil
                                 end)()
                             end
-                        elseif not isActive and pressedKeys[note] then
-                            -- Release key if note passed
-                            VirtualInputManager:SendKeyEvent(false, keymap[columnNum], false, game)
+                        elseif not active and pressedKeys[note] then
+                            VirtualInputManager:SendKeyEvent(false, keymap[colNum], false, game)
                             pressedKeys[note] = nil
                         end
                     end
                 end
             end
-        end)
+        end
         RunService.Heartbeat:Wait()
     end
 end
+
 
 
         coroutine.wrap(autoplay)()
