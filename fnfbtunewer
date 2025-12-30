@@ -8,7 +8,7 @@ local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.Place
 local player = game:GetService("Players").LocalPlayer
 
 local Window = Fluent:CreateWindow({
-    Title = "CAP",
+    Title = "V",
     SubTitle = gamename,
     TabWidth = 130,
     Size = UDim2.fromOffset(490, 400),
