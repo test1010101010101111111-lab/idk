@@ -8,7 +8,7 @@ local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.Place
 local player = game:GetService("Players").LocalPlayer
 
 local Window = Fluent:CreateWindow({
-    Title = "V",
+    Title = "Uni Hub  |",
     SubTitle = gamename,
     TabWidth = 130,
     Size = UDim2.fromOffset(490, 400),
@@ -30,87 +30,63 @@ local Toggle = Tabs.Main:AddToggle("Toggle", {
     Default = false
 })
 
--- ===== Improved Autoplay =====
-local function getKeymap()
-    if not Side then return {} end
-    local fields = player.PlayerGui.Window.Game.Fields[Side].Inner
-    local map = {}
-    for i = 1, 9 do
-        local lane = fields["Lane"..i]
-        if lane and lane:FindFirstChild("Labels") and lane.Labels:FindFirstChild("Label") then
-            local keyText = lane.Labels.Label.Text
-            map[i] = Enum.KeyCode[keyText]
-        end
-    end
-    return map
-end
+Toggle:OnChanged(function()
+    if Toggle.Value then
+        local VirtualInputManager = game:GetService("VirtualInputManager")
+        local RunService = game:GetService("RunService")
 
-local function setupColumns()
-    if not Side then return {} end
-    local fields = player.PlayerGui.Window.Game.Fields[Side].Inner
-    local columns = {}
-    for i = 1, 9 do
-        local lane = fields["Lane"..i]
-        if lane and lane:FindFirstChild("Notes") then
-            columns[i] = lane.Notes:GetChildren()
-        else
-            columns[i] = {}
-        end
-    end
-    return columns
-end
+        _G.auto = true
+        _G.Delay = _G.Delay or 0
 
-local function autoplay()
-    local RunService = game:GetService("RunService")
-    local VirtualInputManager = game:GetService("VirtualInputManager")
-    local pressedKeys = {}
+        local function autoplay()
+            local pressedNotes = {}
 
-    while _G.auto do
-        if Side then
-            local keymap = getKeymap()
-            local columns = setupColumns()
-            local threshold = 0.4 + (_G.Delay or 0)
+            while _G.auto do
+                if Side then
+                    for i = 1, 9 do
+                        local lane = player.PlayerGui.Window.Game.Fields[Side].Inner["Lane"..i]
+                        if lane and lane:FindFirstChild("Notes") then
+                            for _, note in ipairs(lane.Notes:GetChildren()) do
+                                if note:IsA("GuiObject") then
+                                    local threshold = 0.4 + _G.Delay
+                                    -- Press note
+                                    if note.Position.Y.Scale > threshold and not pressedNotes[note] then
+                                        pressedNotes[note] = true
+                                        VirtualInputManager:SendKeyEvent(true, _G["key"..i], false, game)
 
-            for colNum, notes in pairs(columns) do
-                for _, note in ipairs(notes) do
-                    if note:IsA("GuiObject") then
-                        if note.Position.Y.Scale > threshold and not pressedKeys[note] then
-                            pressedKeys[note] = true
-                            VirtualInputManager:SendKeyEvent(true, keymap[colNum], false, game)
-
-                            -- Handle long notes
-                            if #note:GetChildren() == 2 then
-                                coroutine.wrap(function()
-                                    while note.Parent and note.Position.Y.Scale > threshold and _G.auto do
-                                        RunService.Heartbeat:Wait()
+                                        -- Handle long notes
+                                        if #note:GetChildren() == 2 then
+                                            coroutine.wrap(function()
+                                                while note.Parent and note.Position.Y.Scale > threshold and _G.auto do
+                                                    RunService.Heartbeat:Wait()
+                                                end
+                                                VirtualInputManager:SendKeyEvent(false, _G["key"..i], false, game)
+                                                pressedNotes[note] = nil
+                                            end)()
+                                        end
+                                    elseif note.Position.Y.Scale <= threshold and pressedNotes[note] then
+                                        -- Release note
+                                        VirtualInputManager:SendKeyEvent(false, _G["key"..i], false, game)
+                                        pressedNotes[note] = nil
                                     end
-                                    VirtualInputManager:SendKeyEvent(false, keymap[colNum], false, game)
-                                    pressedKeys[note] = nil
-                                end)()
+                                end
                             end
-                        elseif note.Position.Y.Scale <= threshold and pressedKeys[note] then
-                            VirtualInputManager:SendKeyEvent(false, keymap[colNum], false, game)
-                            pressedKeys[note] = nil
                         end
                     end
                 end
+                RunService.Heartbeat:Wait()
             end
         end
-        RunService.Heartbeat:Wait()
-    end
-end
--- ===== End Autoplay =====
 
-Toggle:OnChanged(function()
-    if Toggle.Value then
-        _G.auto = true
         coroutine.wrap(autoplay)()
     else
         _G.auto = false
     end
 end)
 
+
 Toggle:SetValue(false)
+
 
 game.GuiService.MenuOpened:Connect(function()
     if Toggle.Value then
@@ -309,5 +285,17 @@ while true do
     if player.PlayerGui.GameGui.Windows.SongSelector.Visible == true then
         CheckSide()
     end
+    pcall(function()
+        keymap = player.PlayerGui.Window.Game.Fields[Side].Inner
+        key1 = Enum.KeyCode[keymap["Lane1"].Labels.Label.Text.text]
+        key2 = Enum.KeyCode[keymap["Lane2"].Labels.Label.Text.text]
+        key3 = Enum.KeyCode[keymap["Lane3"].Labels.Label.Text.text]
+        key4 = Enum.KeyCode[keymap["Lane4"].Labels.Label.Text.text]
+        key5 = Enum.KeyCode[keymap["Lane5"].Labels.Label.Text.text]
+        key6 = Enum.KeyCode[keymap["Lane6"].Labels.Label.Text.text]
+        key7 = Enum.KeyCode[keymap["Lane7"].Labels.Label.Text.text]
+        key8 = Enum.KeyCode[keymap["Lane8"].Labels.Label.Text.text]
+        key9 = Enum.KeyCode[keymap["Lane9"].Labels.Label.Text.text]
+    end)
     task.wait()
 end
