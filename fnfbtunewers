@@ -1,14 +1,15 @@
--- Funky Friday
--- 1xyzz
+-- Improved Funky Friday Auto Player Script
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-
 local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-
 local player = game:GetService("Players").LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 
+-- UI Initialization
 local Window = Fluent:CreateWindow({
-    Title = "Uni Hub  |",
+    Title = "U |",
     SubTitle = gamename,
     TabWidth = 130,
     Size = UDim2.fromOffset(490, 400),
@@ -23,189 +24,178 @@ local Tabs = {
 }
 
 local Side = nil
+local autoRunning = false
 
-local Toggle = Tabs.Main:AddToggle("Toggle", {
+-- Key mapping (default keys, can be dynamically updated)
+local keyMap = {
+    [1] = Enum.KeyCode.Q,
+    [2] = Enum.KeyCode.W,
+    [3] = Enum.KeyCode.E,
+    [4] = Enum.KeyCode.R,
+    [5] = Enum.KeyCode.T,
+    [6] = Enum.KeyCode.Y,
+    [7] = Enum.KeyCode.U,
+    [8] = Enum.KeyCode.I,
+    [9] = Enum.KeyCode.O,
+}
+
+-- Helper function to setup columns
+local function setupColumns(side)
+    local columns = {}
+    local success, ap = pcall(function()
+        return player.PlayerGui.Window.Game.Fields[side].Inner
+    end)
+    if not success or not ap then return columns end
+
+    for i = 1, 9 do
+        local success, lane = pcall(function()
+            return ap["Lane"..i]
+        end)
+        if success and lane then
+            local success2, notes = pcall(function()
+                return lane.Notes
+            end)
+            if success2 then
+                columns[i] = notes
+            end
+        end
+    end
+    return columns
+end
+
+-- Auto Play Function
+local function autoPlay()
+    local trackedChildren = {}
+    local activationThreshold = 0.4
+    while autoRunning do
+        local columns = setupColumns(Side)
+        if #columns == 0 then wait(0.1) continue end
+
+        -- Track children
+        for colIdx, column in ipairs(columns) do
+            trackedChildren[colIdx] = {}
+            for _, child in ipairs(column:GetChildren()) do
+                if child:IsA("GuiObject") and child.Position.Y.Scale > activationThreshold then
+                    trackedChildren[colIdx][child] = true
+                    VirtualInputManager:SendKeyEvent(true, keyMap[colIdx], false, game)
+                end
+            end
+        end
+
+        -- Monitoring loop
+        while autoRunning do
+            for colIdx, column in ipairs(columns) do
+                for _, child in ipairs(column:GetChildren()) do
+                    if child:IsA("GuiObject") then
+                        local isTracked = trackedChildren[colIdx][child]
+                        local shouldActivate = child.Position.Y.Scale > activationThreshold
+                        if shouldActivate and not isTracked then
+                            -- New note to hit
+                            trackedChildren[colIdx][child] = true
+                            VirtualInputManager:SendKeyEvent(true, keyMap[colIdx], false, game)
+
+                            -- Release key after note is held
+                            if #child:GetChildren() == 2 then
+                                coroutine.wrap(function()
+                                    while child.Parent and child.Position.Y.Scale > activationThreshold and autoRunning do
+                                        RunService.Heartbeat:Wait()
+                                    end
+                                    VirtualInputManager:SendKeyEvent(false, keyMap[colIdx], false, game)
+                                    trackedChildren[colIdx][child] = nil
+                                end)()
+                            end
+                        elseif not shouldActivate and isTracked then
+                            -- Note passed
+                            VirtualInputManager:SendKeyEvent(false, keyMap[colIdx], false, game)
+                            trackedChildren[colIdx][child] = nil
+                        end
+                    end
+                end
+            end
+            RunService.Heartbeat:Wait(0.01)
+        end
+        wait(0.1)
+    end
+end
+
+-- Toggle Auto Player
+local toggleAutoPlayer = Tabs.Main:AddToggle("AutoPlayerToggle", {
     Title = "Auto Player",
     Description = "Automatically Hit Notes (toggle while in song)",
     Default = false
 })
 
-Toggle:OnChanged(function()
-    if Toggle.Value then
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        local RunService = game:GetService("RunService")
-
-        _G.auto = true
-        _G.Delay = _G.Delay or 0
-
-        local function autoplay()
-            local pressedNotes = {}
-
-            while _G.auto do
-                if Side then
-                    for i = 1, 9 do
-                        local lane = player.PlayerGui.Window.Game.Fields[Side].Inner["Lane"..i]
-                        if lane and lane:FindFirstChild("Notes") then
-                            for _, note in ipairs(lane.Notes:GetChildren()) do
-                                if note:IsA("GuiObject") then
-                                    local threshold = 0.4 + _G.Delay
-                                    -- Press note
-                                    if note.Position.Y.Scale > threshold and not pressedNotes[note] then
-                                        pressedNotes[note] = true
-                                        VirtualInputManager:SendKeyEvent(true, _G["key"..i], false, game)
-
-                                        -- Handle long notes
-                                        if #note:GetChildren() == 2 then
-                                            coroutine.wrap(function()
-                                                while note.Parent and note.Position.Y.Scale > threshold and _G.auto do
-                                                    RunService.Heartbeat:Wait()
-                                                end
-                                                VirtualInputManager:SendKeyEvent(false, _G["key"..i], false, game)
-                                                pressedNotes[note] = nil
-                                            end)()
-                                        end
-                                    elseif note.Position.Y.Scale <= threshold and pressedNotes[note] then
-                                        -- Release note
-                                        VirtualInputManager:SendKeyEvent(false, _G["key"..i], false, game)
-                                        pressedNotes[note] = nil
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                RunService.Heartbeat:Wait()
-            end
-        end
-
-        coroutine.wrap(autoplay)()
-    else
-        _G.auto = false
+toggleAutoPlayer:OnChanged(function(val)
+    autoRunning = val
+    if val then
+        -- Start auto-play in a coroutine
+        coroutine.wrap(autoPlay)()
     end
 end)
 
-
-Toggle:SetValue(false)
-
-
-game.GuiService.MenuOpened:Connect(function()
-    if Toggle.Value then
-        _G.Toggled = true
-        Toggle:SetValue(false)
-    end
-end)
-
-game.GuiService.MenuClosed:Connect(function()
-    if not Toggle.Value and _G.Toggled then
-        _G.Toggled = false
-        Toggle:SetValue(true)
-    end
-end)
-
-local Keybind = Tabs.Main:AddKeybind("Keybind", {
-    Title = "Auto Player Keybind",
+-- Keybind to toggle auto player
+local keybind = Tabs.Main:AddKeybind("AutoPlayerKeybind", {
+    Title = "Toggle Auto Player",
     Mode = "Toggle",
     Default = "Insert",
-
-    Callback = function(Value)
-        if Toggle.Value then
-            Toggle:SetValue(false)
-        else
-            Toggle:SetValue(true)
-        end
-    end,
-})
-
-local Section = Tabs.Main:AddParagraph({
-    Title = "Use DownScroll",
-})
-
-Tabs.Main:AddSection("Adjustments")
-
-local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
-    Title = "Delay Mode",
-    Values = {"Static", "Random"},
-    Multi = false,
-    Default = 1,
-    Callback = function(Value)
-        _G.Mode = Value
+    Callback = function()
+        toggleAutoPlayer:SetValue(not toggleAutoPlayer.Value)
     end
 })
 
-_G.Mode = "Static"
+-- Delay Mode Dropdown
+local delayMode = "Static"
+local delayDropdown = Tabs.Main:AddDropdown("DelayMode", {
+    Title = "Delay Mode",
+    Values = { "Static", "Random" },
+    Multi = false,
+    Default = 1,
+    Callback = function(val)
+        delayMode = val
+    end
+})
 
-local Slider = Tabs.Main:AddSlider("Slider", {
+-- Note ms Delay Slider
+local delayMs = 0
+local delaySlider = Tabs.Main:AddSlider("DelaySlider", {
     Title = "Note ms Delay",
     Description = "More = Later",
     Default = 0,
     Min = -0.4,
     Max = 0.4,
-    Rounding = 2,
-    Callback = function(Value)
-        pcall(function()
-            if _G.Mode == "Static" then
-                _G.Delay = Value
-                local player = game.Players.LocalPlayer
-                if player.PlayerGui.GameGui.Windows.Configuration.Frame.Body.Content.Settings.Entries.ScrollingFrame.DownScroll.Toggle.Inner.BackgroundColor3 == Color3.new(85/255, 255/255, 85/255) then
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
-                    print("downscroll")
-                else
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
-                    print("upscroll")
-                end
-            else
-                task.spawn(function()
-                    while true do
-                        _G.Delay = math.floor(math.random() * Value * 1000) / 1000
-                        task.wait()
-                    end
-                end)
-                
-                local player = game:GetService("Players").LocalPlayer
-                if player.PlayerGui.GameGui.Windows.Settings.Frame.Body.Settings.Settings.ScrollingFrame.DownScroll.Toggle.Outer.Inner.ImageColor3 == {85, 255, 85} then
-                    _G.Delay = _G.Delay - _G.Delay - _G.Delay
-                else
-                    _G.Delay = math.floor(math.random() * Value * 1000) / 1000
-                end
-            end
-        end)
+    Rounding = 3,
+    Callback = function(val)
+        delayMs = val
     end
 })
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+-- Timer display
+local timerFrame = Tabs.Updates:AddParagraph({ Title = "Time: 00:00:00" })
+local startTime = os.time()
 
-Window:SelectTab(1)
-
-local Timer = Tabs.Updates:AddParagraph({
-    Title = "Time: 00:00:00",
-})
-
-local st = os.time()
-
-local function timer()
+local function updateTimer()
     while true do
-        local et = os.difftime(os.time(), st)
-        local h = math.floor(et / 3600)
-        local m = math.floor((et % 3600) / 60)
-        local s = et % 60
-        local ft = string.format("Time: %02d:%02d:%02d", h, m, s)
-
-        Timer:SetTitle(ft)
-        task.wait(1)
+        local elapsed = os.difftime(os.time(), startTime)
+        local h = math.floor(elapsed / 3600)
+        local m = math.floor((elapsed % 3600) / 60)
+        local s = elapsed % 60
+        timerFrame:SetTitle(string.format("Time: %02d:%02d:%02d", h, m, s))
+        wait(1)
     end
 end
+coroutine.wrap(updateTimer)()
 
-coroutine.wrap(timer)()
-
+-- Discord Button
 Tabs.Updates:AddButton({
     Title = "Discord Server",
     Description = "Copies Discord Invite Link",
     Callback = function()
         setclipboard("https://discord.gg/44PHnFKxq5")
-        Fluent:Notify({Title = "Uni Hub", Content = "Copied Successfuly", Duration = 2})
+        Fluent:Notify({ Title = "Uni Hub", Content = "Copied Successfully", Duration = 2 })
     end
 })
 
+-- Infinite Yield Button
 Tabs.Updates:AddButton({
     Title = "Run Infinite Yield",
     Callback = function()
@@ -213,10 +203,10 @@ Tabs.Updates:AddButton({
     end
 })
 
+-- Handle UI tool
 local backpack = player:WaitForChild("Backpack")
-if backpack:FindFirstChild("Ui") then
-    backpack:FindFirstChild("Ui"):Destroy()
-end
+local existingUI = backpack:FindFirstChild("Ui")
+if existingUI then existingUI:Destroy() end
 
 local tool = Instance.new("Tool")
 tool.Name = "Ui"
@@ -224,78 +214,95 @@ tool.RequiresHandle = false
 tool.TextureId = "rbxassetid://135519282079256"
 tool.Parent = backpack
 
-Open = true
-tool.Activated:Connect(function()
-    if Open then
-        Window:Minimize()
+local function toggleWindow()
+    if Window:IsMinimized() then
+        Window:Restore()
     else
         Window:Minimize()
     end
-end)
+end
 
+tool.Activated:Connect(toggleWindow)
+
+-- Anti-AFK
 local VirtualUser = game:GetService('VirtualUser')
-game:GetService('Players').LocalPlayer.Idled:connect(function()
+game:GetService('Players').LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
-function CheckSide()
-    pcall(function ()
-        local player = game.Players.LocalPlayer
-        local character = player.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+-- Side detection logic
+local function checkSide()
+    local success, character = pcall(function() return player.Character end)
+    if not success or not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
 
-        local minDistTo11 = math.huge
-        local minDistTo21 = math.huge
-
-        for _, stage in pairs(workspace.Map.Stages:GetChildren()) do
-            if stage:FindFirstChild("Teams") then
-                local pads = stage.Teams
-                local part11 = pads:FindFirstChild("Left")
-                local part21 = pads:FindFirstChild("Right")
-                
-                if part11 and (rootPart.Position - part11.Position).magnitude <= 5 then
-                    local distTo11 = (rootPart.Position - part11.Position).magnitude
-                    if distTo11 < minDistTo11 then
-                        minDistTo11 = distTo11
-                    end
-                end
-
-                if part21 and (rootPart.Position - part21.Position).magnitude <= 5 then
-                    local distTo21 = (rootPart.Position - part21.Position).magnitude
-                    if distTo21 < minDistTo21 then
-                        minDistTo21 = distTo21
-                    end
-                end
+    local minDistLeft, minDistRight = math.huge, math.huge
+    for _, stage in pairs(workspace.Map.Stages:GetChildren()) do
+        if stage:FindFirstChild("Teams") then
+            local pads = stage.Teams
+            local leftPad = pads:FindFirstChild("Left")
+            local rightPad = pads:FindFirstChild("Right")
+            if leftPad and (rootPart.Position - leftPad.Position).magnitude <= 5 then
+                local dist = (rootPart.Position - leftPad.Position).magnitude
+                minDistLeft = math.min(minDistLeft, dist)
+            end
+            if rightPad and (rootPart.Position - rightPad.Position).magnitude <= 5 then
+                local dist = (rootPart.Position - rightPad.Position).magnitude
+                minDistRight = math.min(minDistRight, dist)
             end
         end
+    end
 
-        if minDistTo11 < minDistTo21 then
-            Side = "Left"
-        elseif minDistTo21 < minDistTo11 then
-            Side = "Right"
-        else
-
-        end
-    end)
+    if minDistLeft < minDistRight then
+        Side = "Left"
+    elseif minDistRight < minDistLeft then
+        Side = "Right"
+    end
 end
 
-while true do
-    local player = game:GetService("Players").LocalPlayer
-    if player.PlayerGui.GameGui.Windows.SongSelector.Visible == true then
-        CheckSide()
+-- Continuous side detection
+coroutine.wrap(function()
+    while true do
+        if player.PlayerGui.GameGui.Windows.SongSelector.Visible then
+            checkSide()
+        end
+        wait(0.5)
     end
-    pcall(function()
-        keymap = player.PlayerGui.Window.Game.Fields[Side].Inner
-        key1 = Enum.KeyCode[keymap["Lane1"].Labels.Label.Text.text]
-        key2 = Enum.KeyCode[keymap["Lane2"].Labels.Label.Text.text]
-        key3 = Enum.KeyCode[keymap["Lane3"].Labels.Label.Text.text]
-        key4 = Enum.KeyCode[keymap["Lane4"].Labels.Label.Text.text]
-        key5 = Enum.KeyCode[keymap["Lane5"].Labels.Label.Text.text]
-        key6 = Enum.KeyCode[keymap["Lane6"].Labels.Label.Text.text]
-        key7 = Enum.KeyCode[keymap["Lane7"].Labels.Label.Text.text]
-        key8 = Enum.KeyCode[keymap["Lane8"].Labels.Label.Text.text]
-        key9 = Enum.KeyCode[keymap["Lane9"].Labels.Label.Text.text]
-    end)
-    task.wait()
+end)()
+
+-- Main loop for updating key mappings
+while true do
+    if Side then
+        local success, keyMapData = pcall(function()
+            local gui = player.PlayerGui.Window
+            local fields = gui.Game.Fields[Side].Inner
+            return {
+                Lane1 = Enum.KeyCode[fields["Lane1"].Labels.Label.Text.Text],
+                Lane2 = Enum.KeyCode[fields["Lane2"].Labels.Label.Text.Text],
+                Lane3 = Enum.KeyCode[fields["Lane3"].Labels.Label.Text.Text],
+                Lane4 = Enum.KeyCode[fields["Lane4"].Labels.Label.Text.Text],
+                Lane5 = Enum.KeyCode[fields["Lane5"].Labels.Label.Text.Text],
+                Lane6 = Enum.KeyCode[fields["Lane6"].Labels.Label.Text.Text],
+                Lane7 = Enum.KeyCode[fields["Lane7"].Labels.Label.Text.Text],
+                Lane8 = Enum.KeyCode[fields["Lane8"].Labels.Label.Text.Text],
+                Lane9 = Enum.KeyCode[fields["Lane9"].Labels.Label.Text.Text],
+            }
+        end)
+        if success then
+            keyMap = {
+                [1] = keyMapData.Lane1,
+                [2] = keyMapData.Lane2,
+                [3] = keyMapData.Lane3,
+                [4] = keyMapData.Lane4,
+                [5] = keyMapData.Lane5,
+                [6] = keyMapData.Lane6,
+                [7] = keyMapData.Lane7,
+                [8] = keyMapData.Lane8,
+                [9] = keyMapData.Lane9,
+            }
+        end
+    end
+    wait(0.5)
 end
