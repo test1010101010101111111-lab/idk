@@ -80,7 +80,7 @@ local function cacheColumns()
 end
 
 -- Cache keybinds
-llocal function cacheKeybinds()
+local function cacheKeybinds()
     local inner = player.PlayerGui.Window.Game.Fields[State.side].Inner
     State.keymap = {}
 
@@ -102,27 +102,35 @@ end
 
 -- Play notes
 local function autoplayStep()
+    if not State.enabled then return end
+
     local threshold = 0.4 + State.delay
 
     for col, notes in pairs(State.columns) do
+        local key = State.keymap[col]
+        if not key then continue end
+
         for _, note in ipairs(notes:GetChildren()) do
             if note:IsA("GuiObject") and note.Position.Y.Scale > threshold then
-                VirtualInputManager:SendKeyEvent(true, State.keymap[col], false, game)
+                VirtualInputManager:SendKeyEvent(true, key, false, game)
 
                 if #note:GetChildren() == 2 then
                     task.spawn(function()
-                        while note.Parent and note.Position.Y.Scale > threshold and State.enabled do
+                        while note.Parent
+                        and note.Position.Y.Scale > threshold
+                        and State.enabled do
                             RunService.Heartbeat:Wait()
                         end
-                        VirtualInputManager:SendKeyEvent(false, State.keymap[col], false, game)
+                        VirtualInputManager:SendKeyEvent(false, key, false, game)
                     end)
                 else
-                    VirtualInputManager:SendKeyEvent(false, State.keymap[col], false, game)
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
                 end
             end
         end
     end
 end
+
 
 local function enable()
     if State.enabled then return end
