@@ -1,0 +1,295 @@
+-- Funky Friday
+-- Vortex (fixed)
+
+local Fluent = loadstring(game:HttpGet(
+    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local MarketplaceService = game:GetService("MarketplaceService")
+local GuiService = game:GetService("GuiService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+local gamename = MarketplaceService:GetProductInfo(game.PlaceId).Name
+
+-- ================= UI =================
+
+local Window = Fluent:CreateWindow({
+    Title = "Vortex Elite |",
+    SubTitle = gamename,
+    TabWidth = 130,
+    Size = UDim2.fromOffset(490, 400),
+    Acrylic = true,
+    Theme = "Amethyst",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Updates = Window:AddTab({ Title = "Home", Icon = "home" }),
+    Main = Window:AddTab({ Title = "Main", Icon = "play" }),
+}
+
+local Toggle = Tabs.Main:AddToggle("AutoPlay", {
+    Title = "Auto Player",
+    Description = "Automatically hit notes (toggle while in song)",
+    Default = false
+})
+
+-- ================= STATE =================
+
+local State = {
+    enabled = false,
+    delay = 0,
+    side = nil,
+    connection = nil
+}
+
+local activeHolds = {}
+
+-- ================= SIDE DETECTION =================
+
+local function detectSide()
+    State.side = nil
+
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    for _, stage in ipairs(workspace.Map.Stages:GetChildren()) do
+        local teams = stage:FindFirstChild("Teams")
+        if teams then
+            for _, side in {"Left", "Right"} do
+                local pad = teams:FindFirstChild(side)
+                if pad and (root.Position - pad.Position).Magnitude <= 5 then
+                    State.side = side
+                    return
+                end
+            end
+        end
+    end
+end
+
+-- ================= AUTOPLAY =================
+
+local function autoplayStep()
+    if not State.enabled then return end
+
+    if not State.side then
+        detectSide()
+        return
+    end
+
+    -- cleanup dead notes
+    for note in pairs(activeHolds) do
+        if not note.Parent then
+            activeHolds[note] = nil
+        end
+    end
+
+    local gui = player.PlayerGui
+    local window = gui:FindFirstChild("Window")
+    if not window then return end
+
+    local fields = window.Game:FindFirstChild("Fields")
+    if not fields then return end
+
+    local field = fields:FindFirstChild(State.side)
+    if not field then return end
+
+    local inner = field:FindFirstChild("Inner")
+    if not inner then return end
+
+    local threshold = 0.4 + State.delay
+
+    for i = 1, 9 do
+        local lane = inner:FindFirstChild("Lane"..i)
+        if not lane then continue end
+
+        local notes = lane:FindFirstChild("Notes")
+        local label = lane:FindFirstChild("Labels")
+            and lane.Labels:FindFirstChild("Label")
+
+        local key = label and Enum.KeyCode[label.Text]
+        if not notes or not key then continue end
+
+        for _, note in ipairs(notes:GetChildren()) do
+            if not note:IsA("GuiObject") then continue end
+            if note.Position.Y.Scale <= threshold then continue end
+            if activeHolds[note] then continue end
+
+            activeHolds[note] = true
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+
+            if note:FindFirstChild("Tail") then
+                task.spawn(function()
+                    while note.Parent
+                        and note.Position.Y.Scale > threshold
+                        and State.enabled do
+                        RunService.Heartbeat:Wait()
+                    end
+                    activeHolds[note] = nil
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                end)
+            else
+                activeHolds[note] = nil
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
+            end
+        end
+    end
+end
+
+-- ================= ENABLE / DISABLE =================
+
+local function enable()
+    if State.enabled then return end
+
+    detectSide()
+    if not State.side then
+        Fluent:Notify({
+            Title = "Auto Player",
+            Content = "Stand on a stage pad before enabling.",
+            Duration = 3
+        })
+        return
+    end
+
+    State.enabled = true
+    State.connection = RunService.Heartbeat:Connect(autoplayStep)
+end
+
+local function disable()
+    State.enabled = false
+
+    for note in pairs(activeHolds) do
+        activeHolds[note] = nil
+    end
+
+    if State.connection then
+        State.connection:Disconnect()
+        State.connection = nil
+    end
+end
+
+Toggle:OnChanged(function(value)
+    if value then
+        enable()
+    else
+        disable()
+    end
+end)
+
+-- ================= MENU SAFETY =================
+
+local menuToggled = false
+
+GuiService.MenuOpened:Connect(function()
+    if Toggle.Value then
+        menuToggled = true
+        Toggle:SetValue(false)
+    end
+end)
+
+GuiService.MenuClosed:Connect(function()
+    if menuToggled then
+        menuToggled = false
+        Toggle:SetValue(true)
+    end
+end)
+
+-- ================= KEYBIND =================
+
+Tabs.Main:AddKeybind("AutoKey", {
+    Title = "Auto Player Keybind",
+    Mode = "Toggle",
+    Default = "Insert",
+    Callback = function()
+        Toggle:SetValue(not Toggle.Value)
+    end
+})
+
+-- ================= DELAY SLIDER =================
+
+Tabs.Main:AddSection("Adjustments")
+
+Tabs.Main:AddSlider("Delay", {
+    Title = "Note Delay",
+    Description = "More = later hit",
+    Default = 0,
+    Min = -0.4,
+    Max = 0.4,
+    Rounding = 2,
+    Callback = function(v)
+        State.delay = v
+    end
+})
+
+-- ================= TIMER =================
+
+local Timer = Tabs.Updates:AddParagraph({
+    Title = "Time: 00:00:00",
+})
+
+local startTime = os.time()
+
+task.spawn(function()
+    while true do
+        local t = os.difftime(os.time(), startTime)
+        Timer:SetTitle(
+            string.format("Time: %02d:%02d:%02d",
+                math.floor(t / 3600),
+                math.floor((t % 3600) / 60),
+                t % 60
+            )
+        )
+        task.wait(1)
+    end
+end)
+
+-- ================= MISC =================
+
+Tabs.Updates:AddButton({
+    Title = "Discord Server",
+    Description = "Copies invite",
+    Callback = function()
+        setclipboard("https://discord.gg/44PHnFKxq5")
+        Fluent:Notify({ Title = "Copied", Content = "Discord link copied", Duration = 2 })
+    end
+})
+
+Tabs.Updates:AddButton({
+    Title = "Run Infinite Yield",
+    Callback = function()
+        loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"
+        ))()
+    end
+})
+
+-- ================= UI TOOL =================
+
+local backpack = player:WaitForChild("Backpack")
+
+if backpack:FindFirstChild("Ui") then
+    backpack.Ui:Destroy()
+end
+
+local tool = Instance.new("Tool")
+tool.Name = "Ui"
+tool.RequiresHandle = false
+tool.Parent = backpack
+
+tool.Activated:Connect(function()
+    Window:Minimize()
+end)
+
+-- ================= ANTI-AFK =================
+
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+Window:SelectTab(1)
